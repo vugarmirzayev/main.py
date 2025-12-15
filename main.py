@@ -1,46 +1,44 @@
-import os
-from aiogram import Bot, Dispatcher, types, F
-from aiogram.fsm.storage.memory import MemoryStorage
-from aiogram.fsm.state import State, StatesGroup
-from aiogram.fsm.context import FSMContext
-from aiogram.types import ReplyKeyboardRemove
-from aiogram.utils.keyboard import ReplyKeyboardBuilder
-from aiogram import executor
+import asyncio
+from aiogram import Bot, Dispatcher, types
+from aiogram.filters import Command
+from aiogram.types import Message
 
-API_TOKEN = os.getenv("BOT_TOKEN")  # ваш токен
-ADMIN_ID = int(os.getenv("ADMIN_ID"))  # ваш Telegram ID
+# ===== Настройки =====
+BOT_TOKEN = "ВАШ_ТОКЕН_БОТА"
+ADMIN_ID = 123456789  # ваш Telegram ID
 
-bot = Bot(token=API_TOKEN)
-dp = Dispatcher(storage=MemoryStorage())
+bot = Bot(token=BOT_TOKEN)
+dp = Dispatcher()
 
-class Form(StatesGroup):
-    waiting_for_name = State()
+# ===== Обработчик команды /start =====
+@dp.message(Command("start"))
+async def start_handler(message: Message):
+    user_name = message.from_user.full_name
+    # Ответ пользователю
+    await message.answer(f"Привет, {user_name}! Я получил твоё сообщение.")
+    
+    # Уведомление админу
+    await bot.send_message(ADMIN_ID, f"Пользователь {user_name} ({message.from_user.id}) написал /start.")
 
-# Старт
-@dp.message(F.text == "/start")
-async def cmd_start(message: types.Message):
-    await message.answer(
-        "Привет! Как тебя зовут?",
-        reply_markup=ReplyKeyboardRemove()
-    )
-    await state.set_state(Form.waiting_for_name)
+# ===== Обработчик текстовых сообщений =====
+@dp.message()
+async def text_handler(message: Message):
+    user_name = message.from_user.full_name
+    user_text = message.text
+    
+    # Ответ пользователю
+    await message.answer(f"Вы написали: {user_text}")
+    
+    # Уведомление админу
+    await bot.send_message(ADMIN_ID, f"Пользователь {user_name} ({message.from_user.id}) написал: {user_text}")
 
-# Получение имени
-@dp.message(Form.waiting_for_name)
-async def process_name(message: types.Message, state: FSMContext):
-    user_name = message.text
-    user_id = message.from_user.id
-
-    # Ответ участнику
-    await message.answer(f"Приятно познакомиться, {user_name}! ✅")
-
-    # Уведомление админа
-    await bot.send_message(
-        ADMIN_ID,
-        f"Новый участник:\nИмя: {user_name}\nID: {user_id}"
-    )
-
-    await state.clear()
+# ===== Запуск бота =====
+async def main():
+    try:
+        print("Бот запущен...")
+        await dp.start_polling(bot)
+    finally:
+        await bot.session.close()
 
 if __name__ == "__main__":
-    executor.start_polling(dp, skip_updates=True)
+    asyncio.run(main())
