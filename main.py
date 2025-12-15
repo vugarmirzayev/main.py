@@ -1,73 +1,40 @@
 import asyncio
-import random
 from aiogram import Bot, Dispatcher, types
-from aiogram.filters import Command
+from aiogram.types import Message
 
-BOT_TOKEN = "ВАШ_ТОКЕН_БОТА"
-ADMIN_ID = 123456789  # ваш Telegram ID
+API_TOKEN = "ВАШ_ТОКЕН_БОТА"
+ADMIN_ID = 5228684263  # Ваш Telegram ID
 
-bot = Bot(token=BOT_TOKEN)
+bot = Bot(token=API_TOKEN)
 dp = Dispatcher()
 
-# Список участников (user_id: full_name)
-participants = {}
+# Словарь "подарки"
+GIFTS = [
+    "Маленький набор LEGO",
+    "Книга по интересам",
+    "Симпатичная кружка"
+]
 
-# Список уже назначенных подарков (user_id: user_id кому дарит)
-assigned = {}
-
-@dp.message(Command("start"))
-async def start_handler(message: types.Message):
-    user_id = message.from_user.id
-    full_name = message.from_user.full_name
-
-    # Добавляем пользователя в список участников
-    participants[user_id] = full_name
-
-    await message.answer(f"Привет, {full_name}! Вы зарегистрированы для игры 'Случайный Санта'.\n"
-                         "Когда все будут готовы, напишите /get_santa, чтобы узнать, кому вы дарите подарок.")
-    
-    # Отправляем администратору уведомление
-    await bot.send_message(ADMIN_ID, f"Новый участник: {full_name} ({user_id})")
-
-@dp.message(Command("get_santa"))
-async def get_santa_handler(message: types.Message):
+@dp.message()
+async def santa_reply(message: Message):
+    user_name = message.from_user.full_name
     user_id = message.from_user.id
 
-    if user_id not in participants:
-        await message.answer("Сначала нужно зарегистрироваться через /start")
-        return
-
-    # Проверяем, что пользователь еще не получил подарок
-    if user_id in assigned:
-        santa_id = assigned[user_id]
-        santa_name = participants[santa_id]
-        await message.answer(f"Вы уже получили подарок для: {santa_name}")
-        return
-
-    # Формируем список доступных для назначения (не самого себя и тех, кто уже назначен)
-    available = [uid for uid in participants.keys() if uid != user_id and uid not in assigned.values()]
+    # Выбираем подарок случайным образом
+    import random
+    gift = random.choice(GIFTS)
     
-    if not available:
-        await message.answer("К сожалению, пока нет доступных участников для назначения.")
-        return
+    # Ответ пользователю
+    user_text = f"Привет, {user_name}! 🎁 Твой подарок: {gift} (до 50 AZN)"
+    await message.answer(user_text)
 
-    # Случайный выбор
-    chosen_id = random.choice(available)
-    assigned[user_id] = chosen_id
-    chosen_name = participants[chosen_id]
-
-    # Отправляем пользователю результат
-    await message.answer(f"Вы дарите подарок: {chosen_name}")
-
-    # Отправляем администратору уведомление
-    await bot.send_message(ADMIN_ID, f"{participants[user_id]} ({user_id}) дарит подарок {chosen_name} ({chosen_id})")
+    # Отправляем админу
+    admin_text = f"Пользователь: {user_name} (ID: {user_id}) получил подарок: {gift}"
+    await bot.send_message(chat_id=ADMIN_ID, text=admin_text)
 
 async def main():
-    try:
-        print("Бот запущен...")
-        await dp.start_polling(bot)
-    finally:
-        await bot.session.close()
+    print("Бот запущен...")
+    await dp.start_polling(bot)
 
 if __name__ == "__main__":
     asyncio.run(main())
