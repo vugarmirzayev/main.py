@@ -1,103 +1,97 @@
-import random
-from aiogram import Bot, Dispatcher, types
-from aiogram.types import Message
-from aiogram.filters import Command
 import asyncio
+import random
+from aiogram import Bot, Dispatcher
+from aiogram.types import Message
+from aiogram.filters import CommandStart
 
-# ========== ПЕРЕМЕННЫЕ ==========
+# ================== НАСТРОЙКИ ==================
+
 BOT_TOKEN = "8433006649:AAGGiedVbX8DLpr3C5dtTRDHotBZJoybFA0"
-ADMIN_ID = 5228684263  # ваш Telegram ID
+ADMIN_ID = 5228684263  # твой Telegram ID (числом)
 
-# ========== СЛОВАРЬ ИМЕН И ПОДСКАЗОК ==========
+# ================== ДАННЫЕ САНТЫ ==================
+
 available_names = {
-    "Shalala Abdullayeva": "Parfum, Kosmetika, Ukrashenie. No estestvenno lyuboy podarok kotoriy podaren ot dushi samiy lucshiy ❤️",
+    "Shalala Abdullayeva": "Parfum, Kosmetika, Ukrashenie. Lyuboy podarok ot dushi — samiy luchshiy ❤️",
 
     "Zohra Sultanova": "Красивый букет цветов, духи «Скандал», новогодний бокс",
 
     "Narmin Hasanli": "Плед, мягкие тапочки (39–40) или что-то для уюта",
 
-    "Vugar Mirzayev": """Тут интересно получить что-то по твоей фантазии 🙂
-Если совсем не сможешь придумать что-то,
-можно настольную игру (желательно на русском)""",
+    "Vugar Mirzayev": """Что-то по твоей фантазии 🙂
+Если сложно — настольная игра (желательно на русском)""",
 
-    "Amina Qarabayova": """1) Подарочный купон из Olivia
-2) Зимний шарфик (белого или красного цвета), плиз чтобы качество pis olmasin 🥺
-3) Можно красивую сумочку""",
+    "Amina Qarabayova": """Подарочный купон Olivia
+Зимний шарфик (белый или красный)
+Красивая сумочка""",
 
-    "Diana Babayeva": """Проводные наушники Apple (Type-C, старых нет)
+    "Diana Babayeva": """Проводные наушники Apple (Type-C)
 Энзимная пудра Anua
-Лосьоны / баттеры для тела от The Act""",
+Лосьоны / баттеры The Act""",
 
     "Suzanna Babayeva": "Kiko, parfum — на свой выбор",
 
     "Farid Gurbanov": "Что-то интересное, на ваш вкус",
 
-    "Nigar Mustafayeva": """Rare Beauty румяна,
-красивый серебряный браслетик или кольцо,
-большой шарф (чтобы ткань не лезла),
-белый или бордовый,
-нюдовая помада от Anastasia.
-Один из них, но главное — внимание ❤️😂 Çox sağ olun))""",
+    "Nigar Mustafayeva": """Rare Beauty румяна
+Серебряный браслет или кольцо
+Большой шарф
+Нюдовая помада Anastasia""",
 
-    "Malaknisa Heydarzada": "Подарок, выбранный с вниманием и теплом ☃️",
+    "Malaknisa Heydarzada": "Подарок с вниманием и теплом ☃️",
 
-    "Farah Hazizada": """Вещь, которая всегда останется в памяти.
-Что-то ароматное 🥰""",
+    "Farah Hazizada": "Что-то ароматное и запоминающееся 🥰",
 
     "Nargiz Valizada": "На свой вкус 😁",
 
-    "Elnur Tagiyev": """Электрическая зубная щётка,
-сувенир для стола,
-La Roche-Posay (умывка — не фейк, пожалуйста, кожа чувствительная)
+    "Elnur Tagiyev": """Электрическая зубная щётка
+Сувенир для стола
+La Roche-Posay (не фейк)
 Или что угодно от души ✨"""
 }
-}
 
-# Словарь для хранения, кто кому достался
-assigned_santas = {}
+# ================== ИНИЦИАЛИЗАЦИЯ ==================
 
-# ========== НАСТРОЙКА БОТА ==========
-bot = Bot(token=BOT_TOKEN)
+bot = Bot(BOT_TOKEN)
 dp = Dispatcher()
 
-# ========== ОБРАБОТКА /START ==========
-@dp.message(Command("start"))
-async def start(message: Message):
-    user_id = message.from_user.id
+# ================== ОБРАБОТЧИК ==================
 
-    # Проверяем, не получил ли пользователь уже Тайного Санту
-    if user_id in assigned_santas:
-        await message.answer(f"Вы уже получили Тайного Санту для: {assigned_santas[user_id]['name']}")
-        return
+@dp.message(CommandStart())
+async def start(message: Message):
+    global available_names
 
     if not available_names:
-        await message.answer("Все имена уже разыграны! Попробуйте позже.")
+        await message.answer("🎄 Все участники уже распределены. Спасибо!")
         return
 
-    # Рандомно выбираем имя + подсказку
-    assigned_name, hint = random.choice(list(available_names.items()))
-    del available_names[assigned_name]  # чтобы больше не повторялось
+    # случайный выбор
+    name = random.choice(list(available_names.keys()))
+    hint = available_names.pop(name)
 
-    assigned_santas[user_id] = {"name": assigned_name, "hint": hint}
+    # сообщение участнику
+    await message.answer(
+        f"🎅 Твой Secret Santa:\n\n"
+        f"👤 {name}\n\n"
+        f"🎁 Подсказка:\n{hint}"
+    )
 
-    # Ответ пользователю
-    await message.answer(f"Привет! Твой Тайный Санта для: {assigned_name}\nПодсказка: {hint}")
+    # сообщение админу
+    sender = message.from_user
+    sender_name = sender.full_name
+    sender_username = f"@{sender.username}" if sender.username else "без username"
 
-    # Отправка админу
-    try:
-        admin_message = f"Пользователь @{message.from_user.username or message.from_user.full_name} ({user_id}) получил: {assigned_name} с подсказкой: {hint}"
-        await bot.send_message(ADMIN_ID, admin_message)
-    except Exception as e:
-        print(f"Не удалось отправить сообщение админу: {e}")
+    await bot.send_message(
+        ADMIN_ID,
+        f"📬 Новый участник\n\n"
+        f"От: {sender_name} ({sender_username})\n"
+        f"Выпал: {name}"
+    )
 
+# ================== ЗАПУСК ==================
 
-# ========== ЗАПУСК БОТА ==========
 async def main():
-    try:
-        print("Бот запущен...")
-        await dp.start_polling(bot)
-    finally:
-        await bot.session.close()
+    await dp.start_polling(bot)
 
-if name == "main":
+if __name__ == "__main__":
     asyncio.run(main())
