@@ -1,8 +1,6 @@
 import random
 from aiogram import Bot, Dispatcher, types
-from aiogram.types import Message
 from aiogram.filters import Command
-from aiogram.utils.keyboard import ReplyKeyboardBuilder
 import asyncio
 
 # ==== ПЕРЕМЕННЫЕ ====
@@ -26,45 +24,53 @@ participants = {
     "@taqievelnur": "Elektrik dish shetkasi, Masa uchun hediyye suvenirchik, La Roche - Posay (uz penkasi fake olmasin pls uzum hessasdi) Ve ya konlunuzden ne kecirse onuda ala bilersiniz✨"
 }
 
+# ==== СЛОВАРЬ ДЛЯ УЖЕ РАЗДАННЫХ САНТ ====
+assigned = {}  # user_username -> santa_username
+
 # ==== БОТ И ДИСПАТЧЕР ====
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 
 # ==== КОМАНДА /start ====
 @dp.message(Command(commands=["start"]))
-async def start_santa(message: Message):
-    user_username = f"@{message.from_user.username}" if message.from_user.username else None
+async def start_santa(message: types.Message):
+    user_username_raw = message.from_user.username
+    if not user_username_raw:
+        await message.answer("У вас нет username в Telegram. Пожалуйста, добавьте его и попробуйте снова.")
+        return
 
-    if not user_username or user_username not in participants:
+    user_username = f"@{user_username_raw}"
+
+    if user_username not in participants:
         await message.answer("Вы не зарегистрированы в Secret Santa списке.")
         return
 
-    # Исключаем самого себя
-    available = {k: v for k, v in participants.items() if k != user_username}
+    if user_username in assigned:
+        santa_username = assigned[user_username]
+        hint = participants[santa_username]
+        await message.answer(f"🎁 Ваш Secret Santa уже выбран: {santa_username}\n💡 Подсказка: {hint}")
+        return
+
+    # Доступные участники: исключаем самого себя и уже разыгранных
+    available = [u for u in participants.keys() if u != user_username and u not in assigned.values()]
 
     if not available:
         await message.answer("Пока нет доступных участников для жеребьёвки.")
         return
 
     # Выбор случайного участника
-    santa, hint = random.choice(list(available.items()))
+    santa_username = random.choice(available)
+    hint = participants[santa_username]
 
-    # Отправляем пользователю его "сантa"
-    await message.answer(f"🎁 Ваш Secret Santa: {santa}\n💡 Подсказка: {hint}")
+    # Сохраняем результат
+    assigned[user_username] = santa_username
+
+    # Отправляем пользователю
+    await message.answer(f"🎁 Ваш Secret Santa: {santa_username}\n💡 Подсказка: {hint}")
 
     # Отправляем администратору
-    await bot.send_message(ADMIN_ID, f"{user_username} получил {santa} с подсказкой:\n{hint}")
+    await bot.send_message(ADMIN_ID, f"{user_username} получил {santa_username} с подсказкой:\n{hint}")
 
 # ==== ЗАПУСК БОТА ====
 if __name__ == "__main__":
-    import asyncio
-    from aiogram import F
-    from aiogram.utils import exceptions
-
-    async def main():
-        try:
-            await dp.start_polling(bot)
-        except exceptions.TelegramAPIError as e:
-            print(f"Ошибка Telegram API: {e}")
-
-    asyncio.run(main())
+    asyncio.run(dp.start_polling(bot))
