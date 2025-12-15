@@ -1,23 +1,16 @@
-import os
 import random
-from aiogram import Bot, Dispatcher, F
+from aiogram import Bot, Dispatcher, types
 from aiogram.types import Message
+from aiogram.filters import Command
+import asyncio
 
-BOT_TOKEN = os.getenv("BOT_TOKEN") or "8433006649:AAG-XR-l0s0sjDeQ3Jx3AAPNay5RfP1JzWo"
-ADMIN_ID = int(os.getenv("ADMIN_ID") or 5228684263)  # замените на свой Telegram ID
+# ========== ПЕРЕМЕННЫЕ ==========
+BOT_TOKEN = "8433006649:AAG-XR-l0s0sjDeQ3Jx3AAPNay5RfP1JzWo"
+ADMIN_ID = 5228684263  # ваш Telegram ID
 
-# Проверка токена
-if not BOT_TOKEN or BOT_TOKEN == "ВАШ_ТОКЕН_БОТА_СЮДА":
-    raise ValueError("Установите корректный BOT_TOKEN!")
-
-if not ADMIN_ID or ADMIN_ID == 123456789:
-    raise ValueError("Установите корректный ADMIN_ID!")
-bot = Bot(token=BOT_TOKEN)
-dp = Dispatcher()
-
-# Все имена, которые можно раздать
-available_names = [
-   "Вася": "Любит шоколад",
+# ========== СЛОВАРЬ ИМЕН И ПОДСКАЗОК ==========
+available_names = {
+    "Вася": "Любит шоколад",
     "Маша": "Обожает книги",
     "Петя": "Фанат LEGO",
     "Света": "Любит готовить",
@@ -25,37 +18,53 @@ available_names = [
     "Оля": "Коллекционирует фигурки",
     "Никита": "Любит компьютерные игры",
     "Аня": "Фанатка настольных игр"
-]
+}
 
-# Словарь, чтобы отслеживать кому кто достался
+# Словарь для хранения, кто кому достался
 assigned_santas = {}
 
-@dp.message(F.text == "/start")
+# ========== НАСТРОЙКА БОТА ==========
+bot = Bot(token=BOT_TOKEN)
+dp = Dispatcher()
+
+# ========== ОБРАБОТКА /START ==========
+@dp.message(Command("start"))
 async def start(message: Message):
     user_id = message.from_user.id
-    
+
+    # Проверяем, не получил ли пользователь уже Тайного Санту
     if user_id in assigned_santas:
-        await message.answer(f"Привет! Ты уже получил имя: {assigned_santas[user_id]}")
+        await message.answer(f"Вы уже получили Тайного Санту для: {assigned_santas[user_id]['name']}")
         return
-    
+
     if not available_names:
-        await message.answer("Извини, имена закончились, больше никому не можем назначить Санту.")
+        await message.answer("Все имена уже разыграны! Попробуйте позже.")
         return
 
-    # Выбираем рандомное имя
-    assigned_name = random.choice(available_names)
-    available_names.remove(assigned_name)  # чтобы больше не повторялось
-    assigned_santas[user_id] = assigned_name
+    # Рандомно выбираем имя + подсказку
+    assigned_name, hint = random.choice(list(available_names.items()))
+    del available_names[assigned_name]  # чтобы больше не повторялось
 
-    # Отправляем участнику
-    await message.answer(f"Привет! Твой Тайный Санта для: {assigned_name}")
-    
-    # Отправляем админу
-    await bot.send_message(
-        chat_id=ADMIN_ID,
-        text=f"Пользователь @{message.from_user.username} ({user_id}) — получил {assigned_name}"
-    )
+    assigned_santas[user_id] = {"name": assigned_name, "hint": hint}
+
+    # Ответ пользователю
+    await message.answer(f"Привет! Твой Тайный Санта для: {assigned_name}\nПодсказка: {hint}")
+
+    # Отправка админу
+    try:
+        admin_message = f"Пользователь @{message.from_user.username or message.from_user.full_name} ({user_id}) получил: {assigned_name} с подсказкой: {hint}"
+        await bot.send_message(ADMIN_ID, admin_message)
+    except Exception as e:
+        print(f"Не удалось отправить сообщение админу: {e}")
+
+
+# ========== ЗАПУСК БОТА ==========
+async def main():
+    try:
+        print("Бот запущен...")
+        await dp.start_polling(bot)
+    finally:
+        await bot.session.close()
 
 if __name__ == "__main__":
-    import asyncio
-    asyncio.run(dp.start_polling(bot))
+    asyncio.run(main())
