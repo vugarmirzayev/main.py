@@ -18,7 +18,7 @@ class Form(StatesGroup):
 
 # Старт
 @dp.message(F.text == "/start")
-async def cmd_start(message: types.Message, state: FSMContext):
+async def cmd_start(message: types.Message):
     await message.answer(
         "Привет! Как тебя зовут?",
         reply_markup=ReplyKeyboardRemove()
