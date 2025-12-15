@@ -1,72 +1,50 @@
-import os
-import random
+from aiogram import Bot, Dispatcher, types
+from aiogram.types import ParseMode
+from aiogram.utils import executor
 import asyncio
-from aiogram import Bot, Dispatcher
-from aiogram.types import Message
-from aiogram.enums import ParseMode
-from dotenv import load_dotenv
+import random
+import os
 
-# Загружаем переменные окружения
-load_dotenv()
+API_TOKEN = os.getenv("BOT_TOKEN")
+ADMIN_ID = int(os.getenv("ADMIN_ID"))  # Твой Telegram ID для личных сообщений
 
-BOT_TOKEN = os.getenv("BOT_TOKEN")
+bot = Bot(token=API_TOKEN)
+dp = Dispatcher(bot)
 
-if not BOT_TOKEN:
-    raise ValueError("BOT_TOKEN не найден")
+# Пример участников: list of dict с username и first_name
+participants = [
+    {"id": 123456, "username": "user1", "first_name": "Vugar"},
+    {"id": 234567, "username": "user2", "first_name": "Aysel"},
+    {"id": 345678, "username": "user3", "first_name": "Elvin"},
+]
 
-bot = Bot(token=BOT_TOKEN)
-dp = Dispatcher()
+# Перемешиваем участников, чтобы назначить кому дарить подарок
+def assign_santa(participants):
+    givers = participants[:]
+    receivers = participants[:]
+    random.shuffle(receivers)
+    # Если кто-то достался сам себе, меняем
+    for i in range(len(givers)):
+        if givers[i]["id"] == receivers[i]["id"]:
+            # простая перестановка с соседним
+            receivers[i], receivers[(i+1)%len(givers)] = receivers[(i+1)%len(givers)], receivers[i]
+    return dict(zip([p["id"] for p in givers], receivers))
 
-# 🔧 УКАЖИ УЧАСТНИКОВ И ПОДСКАЗКИ
-participants = {
-    "Али": "Любит кофе",
-    "Мария": "Обожает сладкое",
-    "Илья": "Фанат техники",
-    "Анна": "Любит уют и свечи",
-}
+assignments = assign_santa(participants)
 
-assigned = {}   # user_id -> (имя, подсказка)
-available = list(participants.keys())
-
-
-@dp.message()
-async def start_handler(message: Message):
-    if message.text != "/start":
-        return
-
-    user_id = message.from_user.id
-
-    # Если уже получал — показываем снова
-    if user_id in assigned:
-        name, hint = assigned[user_id]
-        await message.answer(
-            f"🎅 *Твой Secret Santa*\n\n"
-            f"*{name}*\n"
-            f"Подсказка: {hint}",
-            parse_mode=ParseMode.MARKDOWN
+async def notify_participants():
+    for giver_id, receiver in assignments.items():
+        # Сообщение участнику
+        await bot.send_message(giver_id,
+            f"Привет! Ты даришь подарок: 🎁 для {receiver['first_name']}"
         )
-        return
 
-    if not available:
-        await message.answer("🎄 Все участники уже распределены")
-        return
-
-    chosen = random.choice(available)
-    available.remove(chosen)
-
-    assigned[user_id] = (chosen, participants[chosen])
-
-    await message.answer(
-        f"🎁 *Твой Secret Santa*\n\n"
-        f"*{chosen}*\n"
-        f"Подсказка: {participants[chosen]}",
-        parse_mode=ParseMode.MARKDOWN
-    )
-
-
-async def main():
-    await dp.start_polling(bot)
-
+    # Сообщение админу
+    admin_text = "Полный список участников:\n\n"
+    for giver_id, receiver in assignments.items():
+        giver = next(p for p in participants if p["id"] == giver_id)
+        admin_text += f"{giver['username']} -> {receiver['username']}\n"
+    await bot.send_message(ADMIN_ID, admin_text)
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    asyncio.run(notify_participants())
