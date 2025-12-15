@@ -1,14 +1,14 @@
 import os
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.fsm.storage.memory import MemoryStorage
-from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
+from aiogram.fsm.context import FSMContext
+from aiogram.types import ReplyKeyboardRemove
 from aiogram.utils.keyboard import ReplyKeyboardBuilder
-from aiogram.types import KeyboardButton, ReplyKeyboardRemove
 from aiogram import executor
 
-API_TOKEN = os.getenv("BOT_TOKEN")
-ADMIN_ID = int(os.getenv("ADMIN_ID"))
+API_TOKEN = os.getenv("BOT_TOKEN")  # ваш токен
+ADMIN_ID = int(os.getenv("ADMIN_ID"))  # ваш Telegram ID
 
 bot = Bot(token=API_TOKEN)
 dp = Dispatcher(storage=MemoryStorage())
@@ -34,7 +34,7 @@ async def process_name(message: types.Message, state: FSMContext):
     # Ответ участнику
     await message.answer(f"Приятно познакомиться, {user_name}! ✅")
 
-    # Отправка админу
+    # Уведомление админа
     await bot.send_message(
         ADMIN_ID,
         f"Новый участник:\nИмя: {user_name}\nID: {user_id}"
