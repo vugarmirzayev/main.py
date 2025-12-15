@@ -1,50 +1,58 @@
-from aiogram import Bot, Dispatcher, types
-from aiogram.types import ParseMode
-from aiogram.utils import executor
-import asyncio
-import random
 import os
+from aiogram import Bot, Dispatcher, types
+from aiogram.filters import Text
+from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
+from aiogram.fsm.storage.memory import MemoryStorage
+from aiogram.fsm.context import FSMContext
+from aiogram.fsm.state import State, StatesGroup
+from aiogram.utils.keyboard import ReplyKeyboardBuilder
+from aiogram import F
+from aiogram import Router
+from aiogram.utils import executor
 
-API_TOKEN = os.getenv("BOT_TOKEN")
-ADMIN_ID = int(os.getenv("5228684263"))  # Твой Telegram ID для личных сообщений
+# -------------------- Настройки --------------------
+API_TOKEN = os.getenv("BOT_TOKEN")   # Токен бота
+ADMIN_ID = int(os.getenv("ADMIN_ID"))  # Твой Telegram ID
 
 bot = Bot(token=API_TOKEN)
-dp = Dispatcher(bot)
+dp = Dispatcher(storage=MemoryStorage())
 
-# Пример участников: list of dict с username и first_name
-participants = [
-    {"id": 123456, "username": "user1", "first_name": "Vugar"},
-    {"id": 234567, "username": "user2", "first_name": "Aysel"},
-    {"id": 345678, "username": "user3", "first_name": "Elvin"},
-]
+# -------------------- FSM --------------------
+class Form(StatesGroup):
+    waiting_for_name = State()
 
-# Перемешиваем участников, чтобы назначить кому дарить подарок
-def assign_santa(participants):
-    givers = participants[:]
-    receivers = participants[:]
-    random.shuffle(receivers)
-    # Если кто-то достался сам себе, меняем
-    for i in range(len(givers)):
-        if givers[i]["id"] == receivers[i]["id"]:
-            # простая перестановка с соседним
-            receivers[i], receivers[(i+1)%len(givers)] = receivers[(i+1)%len(givers)], receivers[i]
-    return dict(zip([p["id"] for p in givers], receivers))
+# -------------------- Клавиатура --------------------
+def get_keyboard():
+    kb = ReplyKeyboardBuilder()
+    kb.add(KeyboardButton(text="Отправить имя"))
+    return kb.as_markup(resize_keyboard=True)
 
-assignments = assign_santa(participants)
+# -------------------- Хэндлеры --------------------
+@dp.message(F.text == "/start")
+async def cmd_start(message: types.Message, state: FSMContext):
+    await message.answer(
+        "Привет! Как тебя зовут?",
+        reply_markup=types.ReplyKeyboardRemove()
+    )
+    await state.set_state(Form.waiting_for_name)
 
-async def notify_participants():
-    for giver_id, receiver in assignments.items():
-        # Сообщение участнику
-        await bot.send_message(giver_id,
-            f"Привет! Ты даришь подарок: 🎁 для {receiver['first_name']}"
-        )
+@dp.message(Form.waiting_for_name)
+async def process_name(message: types.Message, state: FSMContext):
+    user_name = message.text
+    user_id = message.from_user.id
 
-    # Сообщение админу
-    admin_text = "Полный список участников:\n\n"
-    for giver_id, receiver in assignments.items():
-        giver = next(p for p in participants if p["id"] == giver_id)
-        admin_text += f"{giver['username']} -> {receiver['username']}\n"
-    await bot.send_message(ADMIN_ID, admin_text)
+    # Отправляем участнику ответ
+    await message.answer(f"Приятно познакомиться, {user_name}! ✅")
 
+    # Отправляем уведомление админу
+    await bot.send_message(
+        ADMIN_ID,
+        f"Новый участник:\nИмя: {user_name}\nID: {user_id}"
+    )
+
+    # Завершаем FSM
+    await state.clear()
+
+# -------------------- Запуск --------------------
 if __name__ == "__main__":
-    asyncio.run(notify_participants())
+    executor.start_polling(dp, skip_updates=True)
