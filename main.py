@@ -6,7 +6,7 @@ import random
 import os
 
 API_TOKEN = os.getenv("BOT_TOKEN")
-ADMIN_ID = int(os.getenv("ADMIN_ID"))  # Твой Telegram ID для личных сообщений
+ADMIN_ID = int(os.getenv("5228684263"))  # Твой Telegram ID для личных сообщений
 
 bot = Bot(token=API_TOKEN)
 dp = Dispatcher(bot)
